@@ -88,3 +88,115 @@ def handle_basedata(data, basic_data, total_data, tokenizer3, model3):
             key_to_del.append(key)
     for key in key_to_del:
         del basic_data[key]
+        
+def handle_job_obj(total_data):
+    raw_jobs = total_data['job_obj']
+    fixed_jobs = []
+    # 找首个个特殊符号 直接截断后半段加入答案 没找到符号直接加入答案
+    for job in raw_jobs:
+        pos = job.find(':')
+        if pos == -1:
+            pos = job.find('/')
+        if pos == -1:
+            pos = job.find('：')
+        if pos == -1:
+            fixed_jobs.append(job.replace(' ', ''))
+        else:
+            fixed_jobs.append(job[pos+1:].replace(' ', ''))
+    fixed_jobs = list(OrderedDict.fromkeys(fixed_jobs))
+    total_data['job_obj'] = fixed_jobs
+    
+def handle_experience(total_data, tokenizer3, model3):
+    company = []
+    year_interval = 0
+    month_interval = 0
+    for exp in total_data['experience']:
+        # 跑NER找出所有工作单位
+        output_prediction = predict.ner_predict(exp, tokenizer3, model3)
+        company.extend(output_prediction[1])
+        # 计算工作年限
+        matches = re.findall(info.work_time(), exp)
+        if matches:
+            for match in matches:
+                date1 = utils.re_date(match[0])
+                date2 = '2023.04' if match[1] == '今' or match[1] == '至今' else utils.re_date(
+                    match[1])
+                try:
+                    years, months = utils.calculate_date_interval(date1, date2)
+                    if years >= 0:
+                        year_interval += years
+                        month_interval += months
+                except Exception as e:
+                    print(e)
+
+    year_interval += month_interval // 12
+    month_interval %= 12
+    fixed_company = [x for keyword in info.company_endword()
+                     for x in company if x.endswith(keyword) and x != keyword]
+    fixed_company = list(OrderedDict.fromkeys(fixed_company))
+    total_data['tag']['experience_tag'].extend(fixed_company)
+    if year_interval < 60 and year_interval >= 0:
+        total_data['tag']['total_work_time'] = year_interval if month_interval == 0 else year_interval + 1
+    else:
+        total_data['tag']['total_work_time'] = 0
+    # 工作经验分值计算 工作单位和工作年限权重为 1.5
+    total_data['score'] += 1.2 * \
+        len(fixed_company) + 0.1 * (year_interval * 12 + month_interval)
+
+def handle_ability(total_data):
+    # 提前判断是否已经找到了 优化一下性能
+    CET6_flag, CET4_flag, Photoshop_flag, Office_flag, NCRE_flag = False, False, False, False, False
+    CET6_patter = '|'.join(info.self_ability()[0])
+    CET4_patter = '|'.join(info.self_ability()[1])
+    Photoshop_patter = '|'.join(info.self_ability()[2])
+    Office_patter = '|'.join(info.self_ability()[3])
+    NCRE_patter = '|'.join(info.self_ability()[4])
+    # 找出CET Photoshop Office 计算机等级考试 的tag
+    for item in total_data['ability']:
+        if CET6_flag == False:
+            matches = re.findall(CET6_patter, item)
+            if matches:
+                total_data['tag']['ability'].append('CET6')
+                total_data['score'] += info.score_map()['CET6']
+                CET6_flag = True
+        if CET6_flag == False and CET4_flag == False:
+            matches = re.findall(CET4_patter, item)
+            if matches:
+                total_data['tag']['ability'].append('CET4')
+                total_data['score'] += info.score_map()['CET4']
+                CET4_flag = True
+        if Photoshop_flag == False:
+            matches = re.findall(Photoshop_patter, item)
+            if matches:
+                total_data['tag']['ability'].append('Photoshop')
+                Photoshop_flag = True
+        if Office_flag == False:
+            matches = re.findall(Office_patter, item)
+            if matches:
+                total_data['tag']['ability'].append('Office')
+                Office_flag = True
+        if NCRE_flag == False:
+            matches = re.findall(NCRE_patter, item)
+            if matches:
+                total_data['tag']['ability'].append('计算机等级考试')
+                total_data['score'] += info.score_map()['NCRE']
+                NCRE_flag = True
+                
+def handle_job_fit(total_data, tokenizer2, model2):
+    work_time = total_data['tag']['total_work_time']
+    edu = total_data['basic_data']['edu'] if 'edu' in total_data['basic_data'] else ''
+    experience = ''.join(total_data['experience'])
+    office_ability = True if re.findall(
+        '|'.join(info.self_ability()[3]), ''.join(total_data['ability'])) else False
+    age = total_data['basic_data']['age'] if 'age' in total_data['basic_data'] else 0
+
+    predicted_labels = predict.job_predict(experience, tokenizer2, model2)
+    for key in predicted_labels:
+        # 概率比 '暂无' 更小的就没有匹配的必要
+        if key == 0:
+            break
+        if info.edu_map()[edu] >= info.edu_map()[info.job_fit()[key][1]] and work_time >= info.job_fit()[key][2] and \
+                (office_ability or not office_ability and info.job_fit()[key][3]) and age >= info.job_fit()[key][4]:
+            total_data['job_fit'].append(info.job_fit()[key][0])
+    if len(total_data['job_fit']) == 0:
+        total_data['job_fit'].append('暂无')
