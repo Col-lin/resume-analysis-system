@@ -36,3 +36,23 @@ db.createCollection
      {location: "香港", count: 0},
      {location: "澳门", count: 0}
  ])
+
+ db.createCollection("edu_coll")
+ db.edu_coll.insertMany([
+     {education: "小学", count: 0},
+     {education: "初中", count: 0},
+     {education: "高中", count: 0},
+     {education: "中专", count: 0},
+     {education: "大专", count: 0},
+     {education: "本科", count: 0},
+     {education: "学士", count: 0},
+     {education: "硕士", count: 0},
+     {education: "博士", count: 0}
+ ])
+
+db.createCollection("experience_coll")
+db.experience_coll.insertOne({
+    rids:[],
+    total_work_time:[],
+    total_company_count:[]
+})
