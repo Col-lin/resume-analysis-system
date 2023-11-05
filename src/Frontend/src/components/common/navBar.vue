@@ -110,7 +110,7 @@ const get_avatar = () => {
     left: 0;
     width: 100%;
     height: 8vh;
-    background: linear-gradient(to right, rgb(250, 250, 254), rgb(250, 250, 254), rgb(208, 231, 244));
+    background: linear-gradient(to right, rgb(249, 250, 254), rgb(249, 250, 254), rgb(208, 231, 244));
     transition: background-color 0.3s;
     min-width: 1000px;
 }
