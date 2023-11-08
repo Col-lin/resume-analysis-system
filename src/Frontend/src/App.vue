@@ -12,6 +12,8 @@
 
 <script setup>
 import navBar from '@/components/common/navBar.vue'
+import MobileView from './views/MobileView.vue'
+import { InfoStore } from '@/stores/InfoStore'
 
 const infoStore = InfoStore()
 </script>

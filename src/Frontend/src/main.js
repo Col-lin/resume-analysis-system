@@ -1,5 +1,9 @@
 import { createApp } from 'vue'
 import App from './App.vue'
+import router from './router'
+import pinia from '@/stores/store'
+import { InfoStore } from '@/stores/InfoStore'
+import * as echarts from 'echarts'
 
 const debounce = (fn, delay, ...value) => {
     let timer = null
