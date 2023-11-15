@@ -11,9 +11,7 @@
 1. **图片上传**：用户可以上传图片格式的简历。
 2. **信息提取**：系统能够自动识别并提取图片中的文字信息。
 3. **结构化输出**：提取出的信息将以结构化的文字格式呈现。
-4. **信息编辑**：用户可以编辑和修改提取出的信息。
-5. **数据导出**：支持将提取并编辑过的信息导出为多种文本格式。
-6. **人岗匹配**：将简历信息与已有的岗位信息进行匹配，为每个求职者找到最适合的岗位。
+4. **人岗匹配**：将简历信息与已有的岗位信息进行匹配，为每个求职者找到最适合的岗位。
 
 ## 组织结构
 
@@ -30,8 +28,75 @@
 
 | 姓名   | 分工           | 负责模块       | 职责描述                                         |
 |------|--------------|--------------|------------------------------------------------|
-| 秦声鸿  | 项目经理       | 整体协调       | 负责项目的整体协调和管理，解决项目中出现的问题       |
+| 秦声鸿  | 项目经理       | 整体协调       | 负责项目的整体协调和管理，解决项目中出现的问题；帮助进行AI模型的训练和修改一些bug       |
 | 童维希  | 前端开发工程师   | 用户界面(UI)    | 负责用户界面的设计和开发，实现用户与系统的交互       |
 | 胡宇飞  | AI工程师   | 图像处理、文字识别 | 负责图像处理、文字识别模块和人岗匹配模块的开发，提高识别的准确率   |
 | 罗琳程  | 后端开发工程师      | 后端       | 负责系统中后端模块的开发，包括数据库和业务逻辑    |
 
+## 项目运行
+
+### 前端
+
+```shell
+npm install
+
+npm run serve-dev
+```
+
+### 后端
+
+#### FastAPI
+
+1. 下载模型到`FastApi/models`目录下
+
+   链接：https://pan.baidu.com/s/1pRfDXOTXKtjZ5AFQJmH81w?pwd=883h ，提取码：883h
+
+2. 在`FastApi`目录下建立`secrets.txt`
+
+   ```txt
+   [key]
+   jwt_key=XXX
+   ```
+
+   其中 XXX 为自定义的`jwt`密钥
+
+#### Spring Boot
+
+1. `SpringbootApplication.java`中是通过`@PropertySource("classpath:secrets.txt")`注解进行相关数据的读取，在`Springboot/src/main/resources`下建立`secrets.txt`并根据目录中的 yaml 配置文件填入键值对
+   
+2. cd 到 `Springboot` 目录，运行命令`./mvnw spring-boot:run`
+
+#### Express
+
+`Express`中使用了`mammoth`来解析`docx`文件，可以作为`docx2txt`的替代品使用。在某些情况下`mammoth`的解析结果更加准确，具体体现在实际测试中`docx2txt`会重复读取两次内容
+
+你可以在`FastApi/document.py`中自行选择其一作为解析工具
+
+```py
+# import httpx
+import docx2txt
+
+# 方法A 向Express发送请求，通过js库mammoth获取内容
+# async def get_docx_content(file):
+#     # url = 'http://127.0.0.1:3010/analysis-docx-file/'
+#     async with httpx.AsyncClient() as client:
+#         response = await client.post(url, files={"file": file.file})
+#         if response.status_code != 400:
+#             return eval(response.text)
+#         else:
+#             raise Exception
+
+# 方法B 通过python库docx2txt获取内容
+async def get_docx_content(file):
+    with io.BytesIO(await file.read()) as stream:
+        text = docx2txt.process(stream)
+    lines = text.splitlines()
+    stripped_lines = [line.strip('\t').replace('\t', ' ') for line in lines]
+    new_list = [x for x in stripped_lines if x.strip() != '']
+    return new_list
+```
+
+如果使用`Express`需要在该模块下执行
+
+```shell
+node app.js
